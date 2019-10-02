@@ -9,7 +9,6 @@ class Cube {
         this.axisY = new THREE.Vector3(0,1,0);
         this.axisZ = new THREE.Vector3(0,0,1);
         
-        this.alreadyWon=false;
         this.shuffling=false;
         this.rotating = false;
         this.order=order;
@@ -147,7 +146,7 @@ class Cube {
         return {x,y};
     }
 
-    shuffle = (turns=10)=>{
+    shuffle = (turns=1)=>{
         this.shuffling=true;
         const timer =  setInterval(()=>{
             const rand1 = Math.floor(Math.random()*10)%this.order;
@@ -162,7 +161,6 @@ class Cube {
     }
 
     checkGameStatus = ()=>{
-        if(this.alreadyWon) return false;
         for(let i=0;i<this.order;i++){
             for(let j=0;j<this.order;j++){
                 for(let k=0;k<this.order;k++){
@@ -172,7 +170,6 @@ class Cube {
                 }
             }
         }
-        this.alreadyWon=true;
         return true;
     }
 
