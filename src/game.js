@@ -146,7 +146,7 @@ class Cube {
         return {x,y};
     }
 
-    shuffle = (turns=1)=>{
+    shuffle = (turns=10)=>{
         this.shuffling=true;
         const timer =  setInterval(()=>{
             const rand1 = Math.floor(Math.random()*10)%this.order;
