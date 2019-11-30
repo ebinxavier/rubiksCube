@@ -28,11 +28,20 @@ const isMobile = checker.any();
 
 document.addEventListener('DOMContentLoaded', ()=>{
     if(isMobile){
-        document.getElementById('btn').style.margin='10px 3%';
-        document.getElementById('btn').style.width='94%';
-        document.getElementById('btn').style.height='10vh';
-        document.getElementById('btn').style.opacity='0.4';
-        document.getElementById('btn').style.fontSize='50px';
+        const btns = [ 
+            document.getElementById('btn-shuffle'),
+            document.getElementById('btn-reset'),
+            document.getElementById('btn-undo')
+        ]
+        btns.forEach((btn, i)=>{
+            btn.style.margin='10px 3%';
+            btn.style.width='30%';
+            btn.style.left= i*31 +'%';
+            btn.style.height='9vh';
+            btn.style.opacity='0.4';
+            btn.style.fontSize='25px';
+        })
+        camera.position.z = 200;
     }
     }, false);
 
@@ -84,22 +93,23 @@ controls.rotateSpeed = 1;
 else 
 controls.rotateSpeed = 4.0;
 
-controls.zoomSpeed = 1.2;
+controls.zoomSpeed = 0.7;
 // controls.panSpeed = 0.8;
-controls.minDistance = 100;
-controls.maxDistance = 400;
+controls.minDistance = 120;
+controls.maxDistance = 350;
 controls.noZoom = false;
-controls.noPan = false;
 
 // controls.staticMoving = false;
-// if(!isMobile)
-// controls.dynamicDampingFactor = 0.15;
+// if(isMobile){
+// controls.enableDamping = true;
+// controls.dynamicDampingFactor = 0.85;
+// }
 
 controls.keys = [ 65, 83, 68 ];
 controls.mouseButtons={LEFT:0,RIGHT:2};
 controls.noPan=true;
 
-camera.position.set( 50,50,50);
+// camera.position.set( 50,50,50);
 
 if(isMobile)
 controls.enabled = false;
@@ -176,9 +186,61 @@ light5.position.set(-lightDimension,-lightDimension,lightDimension)
 
 let dragStart;
 let dragEnd;
-let currentPlane;
-let currentSign;
-let currentCoordinates;
+let dragStartPiece;
+let currentDragSide;
+
+const extractSide = (vector)=>{
+    const pointsReal = [vector.x,vector.y,vector.z];
+    const points = [vector.x,vector.y,vector.z].map(p=>Math.abs(Math.round(p)));
+    const max = Math.max(...points.map(p=>Math.abs(p)));
+    const index = points.indexOf(max);
+     // x=0, y=1, z=2
+
+    //  console.log("index",index, pointsReal[index]<0?'-ve':'+ve')
+     return {axis: index, direction: pointsReal[index]<0?-1:1 }
+}
+
+const rotateHorizontal = (object, direction)=>{
+    const {z:zReferenceOfPlaneH1} = cube.getCenterPointOfPlane(cube.planeH1);
+    const {z:zReferenceOfPlaneH2} = cube.getCenterPointOfPlane(cube.planeH2);
+    const {z:zPiece} = cube.getCenterPointOfPiece(object);
+    const deltaH1 = zReferenceOfPlaneH1 - zPiece;
+    const deltaH2 = zReferenceOfPlaneH2 - zPiece;
+
+    if(deltaH1>0 && deltaH2>0){
+        console.log("Bottom")
+        cube.rotateBottom(direction);
+    } else if (deltaH1<0 && deltaH2<0){
+        console.log("Top")
+        cube.rotateTop(direction);
+    } else{
+        console.log("Middle")
+        cube.rotateMiddle(direction);
+    }
+}
+
+const rotationHandler = ()=>{
+    const dx = dragEnd.x - dragStart.x;
+    const dy = dragEnd.y - dragStart.y;
+    const dz = dragEnd.z - dragStart.z;
+    // console.log(dragStartPiece, dx,dy,dz);
+    const points = [dx,dy,dz].map(p=>Math.abs(p));
+    const dragIndex = points.indexOf(Math.max(...points.map(p=>Math.abs(p))));
+
+    if(currentDragSide.axis!==2 && dragIndex !==2){
+        const cross = dragEnd.cross(dragStart)
+        const normal = new THREE.Vector3(0,0,1)
+        const direction = cross.dot(normal)<0 ?false: true;
+        rotateHorizontal(dragStartPiece, direction)
+    } 
+    else{
+        const cross = dragEnd.cross(dragStart)
+        const normal = cube.getNormalOfVerticalPlane();
+        const direction = cross.dot(normal)<0 ?false: true;
+        const pieces = cube.getAllPiecesBehindThePlane();
+        cube.rotateVertical(direction, !pieces.includes(dragStartPiece));
+    }
+}
 
 function onMouseDown( event ) {
 mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
@@ -187,27 +249,24 @@ mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 raycaster.setFromCamera(mouse, camera);
 const intersects = raycaster.intersectObjects(scene.children, true);
 
-if(intersects.length){
-    controls.enabled = false;
-    dragStart = intersects[0].point;
-    }
-else {
-    dragStart=undefined;
-}
-   
     if(intersects.length){
-    const block = intersects[0];
-    const {x,y,z} = block.point;
-    const max = Math.max(Math.abs(x),Math.abs(y),Math.abs(z));
-    const plane = [Math.abs(x),Math.abs(y),Math.abs(z)].map(e=>e<max).reduce((a,e,i)=>e?a+i:a,'').split('').map(e=>'xyz'[e]).join('')
-    let dir = 'xyz';
-    plane.split('').forEach(e=>dir=dir.split(e).join(''));
-    const sign = block.point[dir]<0?-1:1;
-    const coord = cube.get3DCoordinatesOfPiece(block.object.parent);
+        controls.enabled = false;
+        dragStart = intersects[0].point;
+        // console.log("Starting",dragStart);
+        currentDragSide =  extractSide(dragStart);
+        }
+    else {
+        dragStart=undefined;
+        currentDragSide=undefined;
+    }
 
-    currentPlane= plane;
-    currentSign= sign;
-    currentCoordinates= coord;
+    if(intersects.length){
+    const [block] = intersects;
+        if(block){
+            // scene.remove(block.object.parent);
+            dragStartPiece = block.object.parent;
+            // console.log("Normal",block.object.geometry.faces[0].normal)
+        }
     }
 }
 
@@ -221,209 +280,38 @@ function touchStart( event ) {
     
     if(intersects.length){
         controls.enabled = false;
+        const [block] = intersects;
         dragStart = intersects[0].point;
+        dragStartPiece = block.object.parent;
+        currentDragSide =  extractSide(dragStart);
         }
     else {
+        controls.enabled = true;
         dragStart=undefined;
+        currentDragSide=undefined;
     }
-       
-        if(intersects.length){
-        controls.enabled = false;   
-        const block = intersects[0];
-        const {x,y,z} = block.point;
-        const max = Math.max(Math.abs(x),Math.abs(y),Math.abs(z));
-        const plane = [Math.abs(x),Math.abs(y),Math.abs(z)].map(e=>e<max).reduce((a,e,i)=>e?a+i:a,'').split('').map(e=>'xyz'[e]).join('')
-        let dir = 'xyz';
-        plane.split('').forEach(e=>dir=dir.split(e).join(''));
-        const sign = block.point[dir]<0?-1:1;
-        const coord = cube.get3DCoordinatesOfPiece(block.object.parent);
-    
-        currentPlane= plane;
-        currentSign= sign;
-        currentCoordinates= coord;
-        } else{
-            controls.enabled = true;   
-        }
-    }
+}
 
 
 function onMouseUp (event){
     if(dragStart && dragEnd){
-    const dx = dragEnd.x - dragStart.x;
-    const dy = dragEnd.y - dragStart.y;
-    const dz = dragEnd.z - dragStart.z;
-    let dir;
-
-    let rotationAxis;
-    let rotationIndex;
-    let rotationDirection;
-
-    switch(currentPlane){
-        case 'xy':
-
-                if(Math.abs(dx)>Math.abs(dy)){
-                    if(dx<0) dir='L';
-                    else dir='R';
-                } else {
-                    if(dy<0) dir='D';
-                    else dir='U';
-                }
-
-                if( dir === 'R' || dir === 'L'){
-                    rotationAxis='y';
-                    rotationIndex = currentCoordinates.y;
-                    rotationDirection = dir === 'L' ? 'anti':'clockwise'
-                } else{
-                    rotationAxis='x';
-                    rotationIndex = currentCoordinates.x;
-                    rotationDirection = dir === 'U' ? 'anti':'clockwise'
-                }
-        break;
-        case 'yz':
-                if(Math.abs(dy)>Math.abs(dz)){
-                    if(dy<0) dir='D';
-                    else dir='U';
-                } else {
-                    if(dz<0) dir='L';
-                    else dir='R';
-                }
-
-                if( dir === 'R' || dir === 'L'){
-                    rotationAxis='y';
-                    rotationIndex = currentCoordinates.y;
-                    rotationDirection = dir === 'R' ? 'anti':'clockwise'
-                } else{
-                    rotationAxis='z';
-                    rotationIndex = currentCoordinates.z;
-                    rotationDirection = dir === 'D' ? 'anti':'clockwise'
-                }
-        break;
-        case 'xz':
-
-                if(Math.abs(dx)>Math.abs(dz)){
-                    if(dx<0) dir='L';
-                    else dir='R';
-                } else {
-                    if(dz<0) dir='U';
-                    else dir='D';
-                }
-
-                if( dir === 'R' || dir === 'L'){
-                    rotationAxis='z';
-                    rotationIndex = currentCoordinates.z;
-                    rotationDirection = dir === 'R' ? 'anti':'clockwise'
-                } else{
-                    rotationAxis='x';
-                    rotationIndex = currentCoordinates.x;
-                    rotationDirection = dir === 'U' ? 'anti':'clockwise'
-                }
-        break;
-    }
-    if(currentSign===-1){
-        rotationDirection = rotationDirection=='clockwise'?'anti':'clockwise';
-    }
-    if(!cube.shuffling){
-    cube.rotateSclice(rotationAxis,rotationIndex,rotationDirection);
-     setTimeout(()=>{
-         if(cube.checkGameStatus())
-            cube.showCongrats();
-     },500)
-   
-    }
-
+        rotationHandler();
     }
     dragStart = undefined;
     dragEnd = undefined;
+    dragStartPiece = undefined;
+    currentDragSide = undefined;
 }
 
 
 function touchEnd (event){
     if(dragStart && dragEnd){
-    const dx = dragEnd.x - dragStart.x;
-    const dy = dragEnd.y - dragStart.y;
-    const dz = dragEnd.z - dragStart.z;
-    let dir;
-
-    let rotationAxis;
-    let rotationIndex;
-    let rotationDirection;
-
-    switch(currentPlane){
-        case 'xy':
-
-                if(Math.abs(dx)>Math.abs(dy)){
-                    if(dx<0) dir='L';
-                    else dir='R';
-                } else {
-                    if(dy<0) dir='D';
-                    else dir='U';
-                }
-
-                if( dir === 'R' || dir === 'L'){
-                    rotationAxis='y';
-                    rotationIndex = currentCoordinates.y;
-                    rotationDirection = dir === 'L' ? 'anti':'clockwise'
-                } else{
-                    rotationAxis='x';
-                    rotationIndex = currentCoordinates.x;
-                    rotationDirection = dir === 'U' ? 'anti':'clockwise'
-                }
-        break;
-        case 'yz':
-                if(Math.abs(dy)>Math.abs(dz)){
-                    if(dy<0) dir='D';
-                    else dir='U';
-                } else {
-                    if(dz<0) dir='L';
-                    else dir='R';
-                }
-
-                if( dir === 'R' || dir === 'L'){
-                    rotationAxis='y';
-                    rotationIndex = currentCoordinates.y;
-                    rotationDirection = dir === 'R' ? 'anti':'clockwise'
-                } else{
-                    rotationAxis='z';
-                    rotationIndex = currentCoordinates.z;
-                    rotationDirection = dir === 'D' ? 'anti':'clockwise'
-                }
-        break;
-        case 'xz':
-
-                if(Math.abs(dx)>Math.abs(dz)){
-                    if(dx<0) dir='L';
-                    else dir='R';
-                } else {
-                    if(dz<0) dir='U';
-                    else dir='D';
-                }
-
-                if( dir === 'R' || dir === 'L'){
-                    rotationAxis='z';
-                    rotationIndex = currentCoordinates.z;
-                    rotationDirection = dir === 'R' ? 'anti':'clockwise'
-                } else{
-                    rotationAxis='x';
-                    rotationIndex = currentCoordinates.x;
-                    rotationDirection = dir === 'U' ? 'anti':'clockwise'
-                }
-        break;
-    }
-    if(currentSign===-1){
-        rotationDirection = rotationDirection=='clockwise'?'anti':'clockwise';
-    }
-    if(!cube.shuffling){
-    cube.rotateSclice(rotationAxis,rotationIndex,rotationDirection);
-     setTimeout(()=>{
-         if(cube.checkGameStatus())
-         cube.showCongrats();
-     },500)
-   
-    }
-
+        rotationHandler();
     }
     dragStart = undefined;
     dragEnd = undefined;
+    dragStartPiece = undefined;
+    currentDragSide = undefined;
 }
 
 
@@ -468,6 +356,32 @@ requestAnimationFrame( animate );
 controls.update(); 
 renderer.render(scene, camera);
 };
+
+const reset = ()=>{
+    cube.destructCube();
+    cube.constructCube();
+}
+
+const shuffle = ()=>{
+    simulate();
+}
+
+const undo = ()=>{
+    cube.undo();
+}
+
+// Event binding
+
+window.addEventListener('keyup',(event)=>{
+    console.log(event.key)
+    switch(event.key.toUpperCase()){
+        case 'A': cube.rotateBottom(); break;
+        case 'S': cube.rotateBottom(true); break;
+        case 'Q': cube.rotateTop(); break;
+        case 'W': cube.rotateTop(true); break;
+        case ' ': cube.rotateVertical();break;
+    }
+})
 
 animate();
 
