@@ -182,11 +182,24 @@ light5.shadow.camera.far = 500      // default
 light5.position.set(-lightDimension,-lightDimension,lightDimension)
 
 
+const light6 = new THREE.SpotLight( 0xffffff, 0.5 );
+light6.castShadow = true;            // default false
+scene.add( light6 );
+
+//Set up shadow properties for the light
+light6.shadow.mapSize.width = 512;  // default
+light6.shadow.mapSize.height = 512; // default
+light6.shadow.camera.near = 0.5;       // default
+light6.shadow.camera.far = 500      // default
+light6.position.set(-lightDimension,lightDimension,-lightDimension)
+
+
 //  Click event handler
 
 let dragStart;
 let dragEnd;
 let dragStartPiece;
+let dragStartSide;
 let currentDragSide;
 
 const extractSide = (vector)=>{
@@ -235,7 +248,7 @@ const rotationHandler = ()=>{
     } 
     else{
         const cross = dragEnd.cross(dragStart)
-        const normal = cube.getNormalOfVerticalPlane();
+        const normal = cube.getNormalOfPlane();
         const direction = cross.dot(normal)<0 ?false: true;
         const pieces = cube.getAllPiecesBehindThePlane();
         cube.rotateVertical(direction, !pieces.includes(dragStartPiece));
@@ -251,8 +264,7 @@ const intersects = raycaster.intersectObjects(scene.children, true);
 
     if(intersects.length){
         controls.enabled = false;
-        dragStart = intersects[0].point;
-        // console.log("Starting",dragStart);
+        dragStart = intersects.find(i=>i.object.name.indexOf('plane')==-1).point;
         currentDragSide =  extractSide(dragStart);
         }
     else {
@@ -261,11 +273,10 @@ const intersects = raycaster.intersectObjects(scene.children, true);
     }
 
     if(intersects.length){
-    const [block] = intersects;
-        if(block){
-            // scene.remove(block.object.parent);
-            dragStartPiece = block.object.parent;
-            // console.log("Normal",block.object.geometry.faces[0].normal)
+    const side = intersects.find(i=>i.object.name.indexOf('plane')==-1); //There might be invible planes blocking the cube
+        if(side){
+            dragStartPiece = side.object.parent;
+            dragStartSide = side.face;
         }
     }
 }
@@ -281,7 +292,7 @@ function touchStart( event ) {
     if(intersects.length){
         controls.enabled = false;
         const [block] = intersects;
-        dragStart = intersects[0].point;
+        dragStart = intersects.find(i=>i.object.name.indexOf('plane')==-1).point;
         dragStartPiece = block.object.parent;
         currentDragSide =  extractSide(dragStart);
         }
@@ -295,7 +306,71 @@ function touchStart( event ) {
 
 function onMouseUp (event){
     if(dragStart && dragEnd){
-        rotationHandler();
+        // rotationHandler();
+        const planes =[];
+        cube.planes.forEach((_, index)=>{
+            const pieces = cube.getAllPiecesBehindThePlane({plane:cube.planes[index], inverse:false});
+            console.log("Len:",pieces.length)
+            if(pieces.includes(dragStartPiece)){
+                planes.push(cube.planes[index]);
+            }
+        }) 
+       
+        const s = cube.getNormalOfFace(dragStartSide);
+        console.log("PlanesAll", planes);
+        planes.forEach(p=>{
+            const nor = cube.getNormalOfPlane(p, true);
+            const dot = s.dot(nor);
+            if(dot>0.9){ // Means this is parellel plane
+                planes.splice(planes.indexOf(p),1);
+                // p.material.visible= true
+            }
+        })
+        // planes.forEach(p=>p.material.visible= true) ;
+        const dir = new THREE.Vector3(); // create once an reuse it
+        const vec = dir.subVectors( dragStart, dragEnd ).normalize();
+
+        const A = dragStart.clone();
+        const B = dragEnd.clone();
+        const C = new THREE.Vector3();
+        const len = 10;
+
+        C.subVectors( B, A ).multiplyScalar( 1 + ( len / C.length() ) ).add( A );
+
+        const raycasterPlane = new THREE.Raycaster(C, vec);
+        const intersects = raycasterPlane.intersectObjects(scene.children, true);
+        intersects.forEach(e=>{
+            if(e.object.name.indexOf('plane')!==-1){
+            const index = planes.indexOf(e.object);
+            if(index!==-1){
+                    planes.splice(index,1);
+                }
+            }
+        })
+        console.log('planes filtered', planes)
+        if(planes.length){
+            const cross = dragEnd.cross(dragStart)
+            const normal = cube.getNormalOfPlane(planes[0], true);
+            const direction = cross.dot(normal)<0 ?1: -1;
+            // console.log('direction', direction);
+            const index = cube.planes.indexOf(planes[0]);
+            const pieces = cube.getAllPiecesBehindThePlane({plane:cube.planes[index], inverse: false});
+            // cube.planes[index].material.visible=true;
+            const center = cube.getCenterPointOfPlane(planes[0]);
+            let incr = 0;
+            const interval = setInterval(()=>{
+                pieces.forEach(p=>{
+                    // scene.children[6].remove(p)
+                    cube.rotateAboutPoint(p, new THREE.Vector3(0,0,0), normal, degree(direction * 12), true);
+                })
+                incr++;
+                if(incr==6) clearInterval(interval);
+            }, 50)
+
+
+        }
+
+        // planes.forEach(p=>scene.children[6].remove(p))
     }
     dragStart = undefined;
     dragEnd = undefined;
@@ -328,7 +403,8 @@ function mouseMove(event){
         if(!isMobile)
         controls.enabled = true;   
     } else {
-        dragEnd=intersects[0].point
+        const obj = intersects.find(i=>i.object.name.indexOf('plane')==-1)
+        dragEnd= obj?obj.point:null; //Avoid invisible planes
         controls.enabled = false;
     }
     mouseEventLimit=mouseEventQuata;
@@ -343,7 +419,7 @@ function touchMove(event){
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(scene.children, true);
     if(intersects.length){
-        dragEnd=intersects[0].point
+        dragEnd=intersects.find(i=>i.object.name.indexOf('plane')==-1).point
         controls.enabled = false;
     }
     mouseEventLimit=mouseEventQuata;
