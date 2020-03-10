@@ -194,6 +194,30 @@ light6.shadow.camera.far = 500      // default
 light6.position.set(-lightDimension,lightDimension,-lightDimension)
 
 
+const light7 = new THREE.SpotLight( 0xffffff, 0.5 );
+light7.castShadow = true;            // default false
+scene.add( light7 );
+
+//Set up shadow properties for the light
+light7.shadow.mapSize.width = 512;  // default
+light7.shadow.mapSize.height = 512; // default
+light7.shadow.camera.near = 0.5;       // default
+light7.shadow.camera.far = 500      // default
+light7.position.set(-lightDimension,-lightDimension,-lightDimension)
+
+
+const light8 = new THREE.SpotLight( 0xffffff, 0.5 );
+light8.castShadow = true;            // default false
+scene.add( light8 );
+
+//Set up shadow properties for the light
+light8.shadow.mapSize.width = 512;  // default
+light8.shadow.mapSize.height = 512; // default
+light8.shadow.camera.near = 0.5;       // default
+light8.shadow.camera.far = 500      // default
+light8.position.set(-lightDimension,lightDimension,lightDimension)
+
+
 //  Click event handler
 
 let dragStart;
@@ -207,10 +231,7 @@ const extractSide = (vector)=>{
     const points = [vector.x,vector.y,vector.z].map(p=>Math.abs(Math.round(p)));
     const max = Math.max(...points.map(p=>Math.abs(p)));
     const index = points.indexOf(max);
-     // x=0, y=1, z=2
-
-    //  console.log("index",index, pointsReal[index]<0?'-ve':'+ve')
-     return {axis: index, direction: pointsReal[index]<0?-1:1 }
+    return {axis: index, direction: pointsReal[index]<0?-1:1 }
 }
 
 const rotateHorizontal = (object, direction)=>{
@@ -261,63 +282,141 @@ mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
 raycaster.setFromCamera(mouse, camera);
 const intersects = raycaster.intersectObjects(scene.children, true);
-
-    if(intersects.length){
-        controls.enabled = false;
-        dragStart = intersects.find(i=>i.object.name.indexOf('plane')==-1).point;
-        currentDragSide =  extractSide(dragStart);
+    try{
+        if(intersects.length){
+            controls.enabled = false;
+            dragStart = intersects.find(i=>i.object.name.indexOf('plane')==-1).point;
+            currentDragSide =  extractSide(dragStart);
+            }
+        else {
+            dragStart=undefined;
+            currentDragSide=undefined;
         }
-    else {
-        dragStart=undefined;
-        currentDragSide=undefined;
-    }
 
-    if(intersects.length){
-    const side = intersects.find(i=>i.object.name.indexOf('plane')==-1); //There might be invible planes blocking the cube
-        if(side){
-            dragStartPiece = side.object.parent;
-            dragStartSide = side.face;
+        if(intersects.length){
+        const side = intersects.find(i=>i.object.name.indexOf('plane')==-1); //There might be invible planes blocking the cube
+            if(side){
+                dragStartPiece = side.object.parent;
+                dragStartSide = side.face;
+            }
         }
+    } catch(e){
+        console.log(e);
     }
 }
 
 
-function touchStart( event ) {
-    mouse.x = ( event.changedTouches[0].clientX / window.innerWidth ) * 2 - 1;
-    mouse.y = - ( event.changedTouches[0].clientY / window.innerHeight ) * 2 + 1;
-    
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(scene.children, true);
-    
-    if(intersects.length){
-        controls.enabled = false;
-        const [block] = intersects;
-        dragStart = intersects.find(i=>i.object.name.indexOf('plane')==-1).point;
-        dragStartPiece = block.object.parent;
-        currentDragSide =  extractSide(dragStart);
+function touchStart( event ) { 
+mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+raycaster.setFromCamera(mouse, camera);
+const intersects = raycaster.intersectObjects(scene.children, true);
+    try{
+        if(intersects.length){
+            controls.enabled = false;
+            dragStart = intersects.find(i=>i.object.name.indexOf('plane')==-1).point;
+            currentDragSide =  extractSide(dragStart);
+            }
+        else {
+            dragStart=undefined;
+            currentDragSide=undefined;
         }
-    else {
-        controls.enabled = true;
-        dragStart=undefined;
-        currentDragSide=undefined;
+
+        if(intersects.length){
+        const side = intersects.find(i=>i.object.name.indexOf('plane')==-1); //There might be invible planes blocking the cube
+            if(side){
+                dragStartPiece = side.object.parent;
+                dragStartSide = side.face;
+            }
+        }
+    } catch(e){
+        console.log(e);
     }
 }
 
 
 function onMouseUp (event){
     if(dragStart && dragEnd){
-        // rotationHandler();
         const planes =[];
         cube.planes.forEach((_, index)=>{
             const pieces = cube.getAllPiecesBehindThePlane({plane:cube.planes[index], inverse:false});
-            console.log("Len:",pieces.length)
             if(pieces.includes(dragStartPiece)){
                 planes.push(cube.planes[index]);
             }
         }) 
        
         const s = cube.getNormalOfFace(dragStartSide);
-        console.log("PlanesAll", planes);
+        planes.forEach(p=>{
+            const nor = cube.getNormalOfPlane(p, true);
+            const dot = s.dot(nor);
+            if(dot>0.9){ // Means this is parellel plane
+                planes.splice(planes.indexOf(p),1);
+                // p.material.visible= true
+            }
+        })
+        // planes.forEach(p=>p.material.visible= true) ;
+        const dir = new THREE.Vector3(); // create once an reuse it
+        const vec = dir.subVectors( dragStart, dragEnd ).normalize();
+
+        const A = dragStart.clone();
+        const B = dragEnd.clone();
+        const C = new THREE.Vector3();
+        const len = 1;
+
+        C.subVectors( B, A ).multiplyScalar( 1 + ( len / C.length() ) ).add( A ); // Make a line on drag direction and cast it through objects
+
+        const raycasterPlane = new THREE.Raycaster(C, vec);
+        const intersects = raycasterPlane.intersectObjects(scene.children, true);
+        const allPlanes = intersects.filter(e=>e.object.name.indexOf('plane')!==-1 && planes.includes(e.object))
+        if(allPlanes && allPlanes.length){
+            allPlanes.forEach(item=>{
+                const index = planes.indexOf(item.object);
+                if(index!==-1 && planes.length>1){
+                    planes.splice(index,1);
+                }
+            })
+        }
+        if(planes.length){
+            const cross = dragEnd.cross(dragStart)
+            const normal = cube.getNormalOfPlane(planes[0], true);
+            const direction = cross.dot(normal)<0 ?1: -1;
+            const index = cube.planes.indexOf(planes[0]);
+            const pieces = cube.getAllPiecesBehindThePlane({plane:cube.planes[index], inverse: false});
+            const center = cube.getCenterPointOfPlane(planes[0]);
+            let incr = 0;
+            cube.undoState.push({plane: cube.planes[index], direction});
+            const interval = setInterval(()=>{
+                pieces.forEach(p=>{
+                    cube.rotateAboutPoint(p, new THREE.Vector3(0,0,0), normal, degree(direction * 12), true);
+                })
+                incr++;
+                if(incr==6) clearInterval(interval);
+            }, 50)
+
+
+        }
+
+    }
+    dragStart = undefined;
+    dragEnd = undefined;
+    dragStartPiece = undefined;
+    currentDragSide = undefined;
+}
+
+
+function touchEnd (event){
+    
+    if(dragStart && dragEnd){
+        const planes =[];
+        cube.planes.forEach((_, index)=>{
+            const pieces = cube.getAllPiecesBehindThePlane({plane:cube.planes[index], inverse:false});
+            if(pieces.includes(dragStartPiece)){
+                planes.push(cube.planes[index]);
+            }
+        }) 
+       
+        const s = cube.getNormalOfFace(dragStartSide);
         planes.forEach(p=>{
             const nor = cube.getNormalOfPlane(p, true);
             const dot = s.dot(nor);
@@ -347,20 +446,17 @@ function onMouseUp (event){
                 }
             }
         })
-        console.log('planes filtered', planes)
         if(planes.length){
             const cross = dragEnd.cross(dragStart)
             const normal = cube.getNormalOfPlane(planes[0], true);
             const direction = cross.dot(normal)<0 ?1: -1;
-            // console.log('direction', direction);
             const index = cube.planes.indexOf(planes[0]);
             const pieces = cube.getAllPiecesBehindThePlane({plane:cube.planes[index], inverse: false});
-            // cube.planes[index].material.visible=true;
             const center = cube.getCenterPointOfPlane(planes[0]);
             let incr = 0;
+            cube.undoState.push({plane: cube.planes[index], direction});
             const interval = setInterval(()=>{
                 pieces.forEach(p=>{
-                    // scene.children[6].remove(p)
                     cube.rotateAboutPoint(p, new THREE.Vector3(0,0,0), normal, degree(direction * 12), true);
                 })
                 incr++;
@@ -370,18 +466,6 @@ function onMouseUp (event){
 
         }
 
-        // planes.forEach(p=>scene.children[6].remove(p))
-    }
-    dragStart = undefined;
-    dragEnd = undefined;
-    dragStartPiece = undefined;
-    currentDragSide = undefined;
-}
-
-
-function touchEnd (event){
-    if(dragStart && dragEnd){
-        rotationHandler();
     }
     dragStart = undefined;
     dragEnd = undefined;
@@ -436,6 +520,7 @@ renderer.render(scene, camera);
 const reset = ()=>{
     cube.destructCube();
     cube.constructCube();
+    cube.undoState=[];
 }
 
 const shuffle = ()=>{
@@ -445,19 +530,6 @@ const shuffle = ()=>{
 const undo = ()=>{
     cube.undo();
 }
-
-// Event binding
-
-window.addEventListener('keyup',(event)=>{
-    console.log(event.key)
-    switch(event.key.toUpperCase()){
-        case 'A': cube.rotateBottom(); break;
-        case 'S': cube.rotateBottom(true); break;
-        case 'Q': cube.rotateTop(); break;
-        case 'W': cube.rotateTop(true); break;
-        case ' ': cube.rotateVertical();break;
-    }
-})
 
 animate();
 

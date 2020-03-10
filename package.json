@@ -5,7 +5,7 @@
   "main": "environment.js",
   "scripts": {
     "start": "babel-watch src/*.js",
-    "build": "babel src -d build && cp ./index.html ./build/index.html && replace 'build/' './' build/index.html",
+    "build": "babel src -d build && cp ./index.html ./build/index.html && cp models/* build && mkdir -p ./build/lib &&cp ./lib/* ./build/lib/ &&replace 'src/' './' build/index.html &&replace '../models/' './' build/megaminx.js",
     "push": "git push git@github.com:ebinxavier/rubiksCube.git master"
   },
   "keywords": [],

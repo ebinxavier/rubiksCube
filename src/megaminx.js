@@ -30,10 +30,10 @@ class Cube {
         // Load a glTF resource
         loader.load(
             // resource URL
-            '../models/megaminx.glb',
+            '../models/megaminx1.glb',
             // called when the resource is loaded
             ( gltf ) => {
-                gltf.scene.scale.set(20,20,20);
+                gltf.scene.scale.set(15,15,15);
                 this.planes =  gltf.scene.children.filter(e=>e.name.indexOf('plane')!==-1);
                 this.planes.forEach(plane=>{
                     plane.material.visible=false;
@@ -65,7 +65,11 @@ class Cube {
     }
 
     destructCube  = ()=>{
-        this.getAllPieces().forEach(obj=>scene.remove(obj));
+        scene.children.forEach(e=>{
+            if(e.type==='Scene'){
+                scene.remove(e)
+            }
+        })
     }
 
     makeTransformToAllChildren = (piece, transformation)=>{
@@ -212,44 +216,19 @@ class Cube {
         })
     }
 
-    rotateVertical = (anti=false, right=false, noAnimation=false)=>{
-        this.undoState = [this.rotateVertical, [!anti, right]];
-        if(this.checkCollisionOfVerticalPlane() || this.animating){
-            console.log("Collision");
-            return;
-        }
-        this.applyTransformations();
-        const pieces = this.getAllPiecesBehindThePlane(right);
-        const axis = this.getNormalOfPlane();
-        const center = this.getCenterPointOfPlane(this.planeV);
-        const incr = 180;
-        let total=0;          
-
-        this.animating = true;
-        if(noAnimation){
-        pieces.forEach(piece=>{
-                this.rotateAboutPoint(piece,center, axis.normalize(), (anti?-1:1) * degree(incr), true);
-                this.animating = false;
-            })
-        }
-        else{
-            const timer = setInterval(()=>{
-                total++;
-                pieces.forEach(piece=>{
-                    this.rotateAboutPoint(piece,center, axis.normalize(), (anti?-1:1) * degree(incr/10), true);
-                })
-                if(total>=10) {
-                    clearInterval(timer);
-                    this.animating = false;
-                }
-            }, isMobile?0: 50)
-        }
-    }
-
     undo = ()=>{
         if(this.undoState.length){
-            this.undoState[0](...this.undoState[1]);
-            this.undoState = [];
+            const {plane, direction} = cube.undoState.pop();
+            const pieces = cube.getAllPiecesBehindThePlane({plane, inverse: false});
+            const normal = cube.getNormalOfPlane(plane, true);
+            let incr=0;
+            const interval = setInterval(()=>{
+                pieces.forEach(p=>{
+                    cube.rotateAboutPoint(p, new THREE.Vector3(0,0,0), normal, degree(-direction * 12), true);
+                })
+                incr++;
+                if(incr==6) clearInterval(interval);
+            }, 50)
         }
     }
     
@@ -259,19 +238,14 @@ const cube = new Cube();
 let timerSimulator;
 let verticalRotated = false;
 const simulate = (count=isMobile?100:200)=>{
-    const operations = [ cube.rotateBottom, cube.rotateMiddle, cube.rotateTop];
     timerSimulator = setInterval(()=>{
-        console.log("count",count)
-        const collision = cube.checkCollisionOfVerticalPlane();
-        const index = Math.round(Math.random() * 10)%operations.length;
-        if(!collision && ! verticalRotated){
-            cube.rotateVertical(true,true,true);
-            verticalRotated = true;
-        }
-        else{
-           operations[index](true,true);
-           verticalRotated = false;
-        }
+        const plane = cube.planes[Math.floor(Math.random()*cube.planes.length)];
+        const pieces = cube.getAllPiecesBehindThePlane({plane, inverse: false});
+        const normal = cube.getNormalOfPlane(plane, true);
+        const direction = 1;
+        pieces.forEach(p=>{
+            cube.rotateAboutPoint(p, new THREE.Vector3(0,0,0), normal, degree(-direction * 72), true);
+        })
         count-=1;
         if(count===0) clearInterval(timerSimulator);
     })
