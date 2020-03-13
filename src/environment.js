@@ -59,6 +59,10 @@ window.addEventListener( 'mouseup', onMouseUp, false );
 window.addEventListener( 'mousemove', mouseMove, false );
 } else{
 window.addEventListener('touchstart',touchStart);
+document.addEventListener('touchstart', function(event){
+    if(event.target.type!=='submit')
+        event.preventDefault();
+}, {passive: false});
 window.addEventListener('touchmove',touchMove);
 window.addEventListener('touchend',touchEnd);
 }

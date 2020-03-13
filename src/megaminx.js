@@ -33,7 +33,7 @@ class Cube {
             '../models/megaminx.glb',
             // called when the resource is loaded
             ( gltf ) => {
-                gltf.scene.scale.set(15,15,15);
+                gltf.scene.scale.set(19,19,19);
                 this.planes =  gltf.scene.children.filter(e=>e.name.indexOf('plane')!==-1);
                 this.planes.forEach(plane=>{
                     plane.material.visible=false;
