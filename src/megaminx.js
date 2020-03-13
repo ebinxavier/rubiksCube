@@ -30,7 +30,7 @@ class Cube {
         // Load a glTF resource
         loader.load(
             // resource URL
-            '../models/megaminx1.glb',
+            '../models/megaminx.glb',
             // called when the resource is loaded
             ( gltf ) => {
                 gltf.scene.scale.set(15,15,15);

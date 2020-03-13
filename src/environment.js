@@ -111,8 +111,8 @@ controls.noPan=true;
 
 // camera.position.set( 50,50,50);
 
-if(isMobile)
-controls.enabled = false;
+// if(isMobile)
+// controls.enabled = false;
 
 // Shadows
 renderer.shadowMap.enabled = true;
@@ -306,9 +306,10 @@ const intersects = raycaster.intersectObjects(scene.children, true);
 }
 
 
-function touchStart( event ) { 
-mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+function touchStart( event ) {
+mouse.x = ( (event.clientX || event.touches[0].clientX) / window.innerWidth ) * 2 - 1;
+mouse.y = - ( (event.clientY || event.touches[0].clientY) / window.innerHeight ) * 2 + 1;
+// alert(JSON.stringify(event,null, 2)) //http://192.168.1.148:8080
 
 raycaster.setFromCamera(mouse, camera);
 const intersects = raycaster.intersectObjects(scene.children, true);
@@ -321,6 +322,7 @@ const intersects = raycaster.intersectObjects(scene.children, true);
         else {
             dragStart=undefined;
             currentDragSide=undefined;
+            controls.enabled = true;
         }
 
         if(intersects.length){
