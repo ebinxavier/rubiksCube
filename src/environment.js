@@ -228,6 +228,7 @@ let dragStart;
 let dragEnd;
 let dragStartPiece;
 let dragStartSide;
+let dragStartObject;
 let currentDragSide;
 
 const extractSide = (vector)=>{
@@ -302,6 +303,7 @@ const intersects = raycaster.intersectObjects(scene.children, true);
             if(side){
                 dragStartPiece = side.object.parent;
                 dragStartSide = side.face;
+                dragStartObject = side.object;
             }
         }
     } catch(e){
@@ -368,12 +370,13 @@ function onMouseUp (event){
         const A = dragStart.clone();
         const B = dragEnd.clone();
         const C = new THREE.Vector3();
-        const len = 1;
+        const len = 5;
 
         C.subVectors( B, A ).multiplyScalar( 1 + ( len / C.length() ) ).add( A ); // Make a line on drag direction and cast it through objects
 
         const raycasterPlane = new THREE.Raycaster(C, vec);
         const intersects = raycasterPlane.intersectObjects(scene.children, true);
+        debugger
         const allPlanes = intersects.filter(e=>e.object.name.indexOf('plane')!==-1 && planes.includes(e.object))
         if(allPlanes && allPlanes.length){
             allPlanes.forEach(item=>{
@@ -383,6 +386,7 @@ function onMouseUp (event){
                 }
             })
         }
+        // planes.forEach(p=>p.material.visible= true) ;
         if(planes.length){
             const cross = dragEnd.cross(dragStart)
             const normal = cube.getNormalOfPlane(planes[0], true);
@@ -494,7 +498,11 @@ function mouseMove(event){
         controls.enabled = true;   
     } else {
         const obj = intersects.find(i=>i.object.name.indexOf('plane')==-1)
-        dragEnd= obj?obj.point:null; //Avoid invisible planes
+        if(obj && dragStartPiece && dragStartObject.name === obj.object.name){
+            dragEnd= obj?obj.point:null; //Avoid invisible planes
+        } else {
+            onMouseUp();
+        }
         controls.enabled = false;
     }
     mouseEventLimit=mouseEventQuata;
