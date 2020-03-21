@@ -336,6 +336,7 @@ const intersects = raycaster.intersectObjects(scene.children, true);
             if(side){
                 dragStartPiece = side.object.parent;
                 dragStartSide = side.face;
+                dragStartObject = side.object;
             }
         }
     } catch(e){
@@ -517,7 +518,13 @@ function touchMove(event){
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(scene.children, true);
     if(intersects.length){
-        dragEnd=intersects.find(i=>i.object.name.indexOf('plane')==-1).point
+        const obj = intersects.find(i=>i.object.name.indexOf('plane')==-1)
+        debugger
+        if(obj && dragStartPiece && dragStartObject.name === obj.object.name){
+            dragEnd= obj?obj.point:null; //Avoid invisible planes
+        } else {
+            onMouseUp();
+        }
         controls.enabled = false;
     }
     mouseEventLimit=mouseEventQuata;
