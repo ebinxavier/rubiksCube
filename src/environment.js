@@ -494,6 +494,20 @@ function mouseMove(event){
     mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(scene.children, true);
+
+    if(dragStartObject){
+        const {r,g,b} = dragStartObject.material.color;
+        if((r<0.09 &&g<0.09 && b<0.09)){
+        const side = intersects.find(i=>i.object.name.indexOf('plane')==-1); //There might be invible planes blocking the cube
+            const {r,g,b} = side?side.object.material.color:{};
+            if(side && !(r<0.09 &&g<0.09 && b<0.09)){
+                dragStartPiece = side.object.parent;
+                dragStartSide = side.face;
+                dragStartObject = side.object;
+            }
+        }
+    } 
+
     if(intersects.length==0){
         if(!isMobile)
         controls.enabled = true;   
@@ -501,8 +515,10 @@ function mouseMove(event){
         const obj = intersects.find(i=>i.object.name.indexOf('plane')==-1)
         if(obj && dragStartPiece && dragStartObject.name === obj.object.name){
             dragEnd= obj?obj.point:null; //Avoid invisible planes
-        } else {
-            onMouseUp();
+        } else if(dragStartObject){
+            const {r,g,b} = dragStartObject.material.color;
+            if(!(r<0.09 &&g<0.09 && b<0.09))
+                onMouseUp();
         }
         controls.enabled = false;
     }
@@ -517,13 +533,29 @@ function touchMove(event){
     mouse.y = - ( event.changedTouches[0].clientY / window.innerHeight ) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(scene.children, true);
+
+    if(dragStartObject){
+        const {r,g,b} = dragStartObject.material.color;
+        if((r<0.09 &&g<0.09 && b<0.09)){
+        const side = intersects.find(i=>i.object.name.indexOf('plane')==-1); //There might be invible planes blocking the cube
+            const {r,g,b} = side?side.object.material.color:{};
+            if(side && !(r<0.09 &&g<0.09 && b<0.09)){
+                dragStartPiece = side.object.parent;
+                dragStartSide = side.face;
+                dragStartObject = side.object;
+            }
+        }
+    }
+
     if(intersects.length){
         const obj = intersects.find(i=>i.object.name.indexOf('plane')==-1)
         debugger
         if(obj && dragStartPiece && dragStartObject.name === obj.object.name){
             dragEnd= obj?obj.point:null; //Avoid invisible planes
-        } else {
-            onMouseUp();
+         } else if(dragStartObject){
+            const {r,g,b} = dragStartObject.material.color;
+            if(!(r<0.09 &&g<0.09 && b<0.09))
+                onMouseUp();
         }
         controls.enabled = false;
     }
